@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocketSDK 使用示例</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        input, select { padding: 8px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; border-radius: 3px; }
+        .log { height: 200px; overflow-y: auto; background: #1e1e1e; color: #0f0; padding: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>WebSocketSDK 使用示例</h1>
+
+    <div class="section">
+        <h3>1. 连接服务器</h3>
+        <input type="text" id="wsUrl" value="ws://localhost:8080/ws" size="30">
+        <button onclick="connect()">连接</button>
+        <button onclick="disconnect()">断开</button>
+        <span id="connStatus" style="margin-left: 10px;">未连接</span>
+    </div>
+
+    <div class="section">
+        <h3>2. 登录</h3>
+        <input type="text" id="userId" value="user001" placeholder="用户ID">
+        <input type="text" id="username" value="张三" placeholder="用户名">
+        <input type="text" id="password" value="123456" placeholder="密码">
+        <input type="text" id="role" value="trader" placeholder="角色">
+        <input type="text" id="module" value="stock" placeholder="初始模块">
+        <button onclick="login()">登录</button>
+    </div>
+
+    <div class="section">
+        <h3>3. 模块订阅</h3>
+        <select id="moduleSelect">
+            <option value="stock">股票 (stock)</option>
+            <option value="futures">期货 (futures)</option>
+            <option value="option">期权 (option)</option>
+        </select>
+        <button onclick="subscribe()">订阅当前选中模块</button>
+        <button onclick="unsubscribe()">取消订阅</button>
+        <button onclick="switchModule()">切换到选中模块</button>
+    </div>
+
+    <div class="section">
+        <h3>4. 发送自定义消息</h3>
+        <input type="text" id="customType" value="CUSTOM_MSG" placeholder="消息类型">
+        <input type="text" id="customContent" value="测试消息" placeholder="消息内容">
+        <button onclick="sendCustom()">发送</button>
+    </div>
+
+    <div class="section">
+        <h3>5. 日志</h3>
+        <button onclick="clearLog()">清空日志</button>
+        <div id="logArea" class="log"></div>
+    </div>
+
+    <!-- 引入 SDK -->
+    <script src="WebSocketSDK.js"></script>
+    <script>
+        // 创建 SDK 实例
+        const sdk = new WebSocketSDK();
+
+        // 日志函数
+        function log(...args) {
+            const logArea = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString();
+            logArea.innerHTML += `<div>[${time}] ${args.join(' ')}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+            console.log('[Demo]', ...args);
+        }
+
+        function clearLog() {
+            document.getElementById('logArea').innerHTML = '';
+        }
+
+        // 连接
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+
+            sdk.connect(url, {
+                debug: true,
+                heartbeatInterval: 25000,
+                reconnectInterval: 3000,
+                reconnectMaxAttempts: 5,
+
+                onOpen: () => {
+                    log('✓ 连接已打开');
+                    document.getElementById('connStatus').textContent = '已连接';
+                    document.getElementById('connStatus').style.color = 'green';
+                },
+
+                onClose: () => {
+                    log('✗ 连接已关闭');
+                    document.getElementById('connStatus').textContent = '已断开';
+                    document.getElementById('connStatus').style.color = 'red';
+                },
+
+                onError: (err) => {
+                    log('✗ 连接错误:', err);
+                },
+
+                onReconnect: (attempt) => {
+                    log('↻ 正在重连... 第', attempt, '次');
+                },
+
+                onLoginSuccess: (data) => {
+                    log('✓ 登录成功:', JSON.stringify(data));
+                },
+
+                onLoginError: (data) => {
+                    log('✗ 登录失败:', data.message);
+                },
+
+                onMessage: (data) => {
+                    log('收到消息:', data.type, JSON.stringify(data));
+                }
+            });
+        }
+
+        // 断开连接
+        function disconnect() {
+            sdk.close();
+        }
+
+        // 登录
+        function login() {
+            const loginInfo = {
+                userId: document.getElementById('userId').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value,
+                module: document.getElementById('module').value
+            };
+            sdk.login(loginInfo);
+            log('发送登录请求:', JSON.stringify(loginInfo));
+        }
+
+        // 订阅
+        function subscribe() {
+            const module = document.getElementById('moduleSelect').value;
+            sdk.subscribe(module);
+            log('订阅模块:', module);
+        }
+
+        // 取消订阅
+        function unsubscribe() {
+            const module = document.getElementById('moduleSelect').value;
+            sdk.unsubscribe(module);
+            log('取消订阅模块:', module);
+        }
+
+        // 切换模块
+        function switchModule() {
+            const oldModule = document.getElementById('module').value;
+            const newModule = document.getElementById('moduleSelect').value;
+            sdk.switchModule(newModule, oldModule);
+            document.getElementById('module').value = newModule;
+            log('切换模块:', oldModule, '->', newModule);
+        }
+
+        // 发送自定义消息
+        function sendCustom() {
+            const type = document.getElementById('customType').value;
+            const content = document.getElementById('customContent').value;
+            sdk.sendMessage({ type, content });
+            log('发送自定义消息:', type, content);
+        }
+    </script>
+</body>
+</html>
